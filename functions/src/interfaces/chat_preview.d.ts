@@ -5,6 +5,5 @@ export interface ChatPreviewItem {
     sender_uid: string;
     sender_photo_url;
     unread_count: number;
-    last_read: number;
     timestamp: number;
 }
