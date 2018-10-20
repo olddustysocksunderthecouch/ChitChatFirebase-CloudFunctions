@@ -1,7 +1,7 @@
 /**
  * Copyright 2018 Google Inc. All Rights Reserved.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Apache License, Version 2.0 (the "License")
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
@@ -13,12 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-'use strict';
+'use strict'
 
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
-import addMessage from './sendMessage'
+import * as functions from 'firebase-functions'
+import * as admin from 'firebase-admin'
+import { addDeviceToken, createAccount, sendMessage, startChat } from './functions'
 
-admin.initializeApp();
+admin.initializeApp()
 
-exports.addMessage = functions.https.onCall(addMessage(functions, admin));
+exports.addDeviceToken = functions.https.onCall(addDeviceToken(functions, admin))
+exports.createAccount = functions.https.onCall(createAccount(functions, admin))
+exports.sendMessage = functions.https.onCall(sendMessage(functions, admin))
+exports.startChat = functions.https.onCall(startChat(functions, admin))

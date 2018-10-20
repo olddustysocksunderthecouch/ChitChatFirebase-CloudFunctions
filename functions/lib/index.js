@@ -1,7 +1,7 @@
 /**
  * Copyright 2018 Google Inc. All Rights Reserved.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
+ * Licensed under the Apache License, Version 2.0 (the "License")
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
@@ -17,7 +17,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
-const addMessage_1 = require("./addMessage");
+const functions_1 = require("./functions");
 admin.initializeApp();
-exports.addMessage = functions.https.onCall(addMessage_1.default(functions, admin));
+exports.addDeviceToken = functions.https.onCall(functions_1.addDeviceToken(functions, admin));
+exports.createAccount = functions.https.onCall(functions_1.createAccount(functions, admin));
+exports.sendMessage = functions.https.onCall(functions_1.sendMessage(functions, admin));
+exports.startChat = functions.https.onCall(functions_1.startChat(functions, admin));
 //# sourceMappingURL=index.js.map
