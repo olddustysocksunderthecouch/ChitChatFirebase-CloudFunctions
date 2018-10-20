@@ -1,1 +1,5 @@
-node_modules/
+# Dependencies
+functions/node_modules/
+
+# VSCODE
+.vscode/
