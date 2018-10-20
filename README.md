@@ -12,22 +12,22 @@
 
 ## List of functions
 
-### addDeviceToken
+### 1. addDeviceToken
 _Add a unique device to a users list of devices_
 #### Object Structure
 - TBD
 
-### createAccount
+### 2. createAccount
 _Create a new user account_
 #### Object Structure
 - TBD
 
-### startChat
+### 3. startChat
 _Start a new chat with a new contact_
 #### Object Structure
 - TBD
 
-### sendMessage
+### 4. sendMessage
 _Send a new message to an existing contact_
 #### Object Structure
 - TBD
