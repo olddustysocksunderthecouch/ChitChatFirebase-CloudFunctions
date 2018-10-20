@@ -28,7 +28,6 @@ _Start a new chat with a new contact_
 - TBD
 
 ### sendMessage
-#### POST /
 _Send a new message to an existing contact_
 #### Object Structure
 - TBD

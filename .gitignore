@@ -3,3 +3,6 @@ functions/node_modules/
 
 # VSCODE
 .vscode/
+
+# MAC
+.DS_STORE
