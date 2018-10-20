@@ -17,7 +17,7 @@
 
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-import addMessage from './addMessage'
+import addMessage from './sendMessage'
 
 admin.initializeApp();
 

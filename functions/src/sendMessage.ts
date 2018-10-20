@@ -5,7 +5,6 @@ export default (functions, admin) => (data, context) => {
     const sender_name = data.sender_name
     const timestamp = data.timestamp
     const chatId = data.chat_id
-    console.log(data)
 
     const uid = context.auth.uid;
 
