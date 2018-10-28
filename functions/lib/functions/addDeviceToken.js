@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const error = require('./handlers');
+const handlers_1 = require("./handlers");
 exports.default = (functions, admin) => (data, context) => {
     if (!context.auth) {
-        return error('Authorization Error', 401);
+        return handlers_1.Handlers.triggerAuthorizationError();
     }
+    return null;
 };
 //# sourceMappingURL=addDeviceToken.js.map

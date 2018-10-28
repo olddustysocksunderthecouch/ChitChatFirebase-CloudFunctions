@@ -1,50 +1,103 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = (functions, admin) => (data, context) => {
+const handlers_1 = require("./handlers");
+exports.default = (functions, admin) => (data, context) => __awaiter(this, void 0, void 0, function* () {
     const message = data.message;
-    const sender_name = data.sender_name;
-    const timestamp = data.timestamp;
-    const chatId = data.chat_id;
-    const uid = context.auth.uid;
     // Validations and security
     if (!(typeof message === 'string') || message.length === 0) {
-        // Throwing an HttpsError so that the client gets the error details.
-        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with ' +
-            'one arguments "text" containing the message text to add.');
+        return handlers_1.Handlers.error('invalid-argument', {
+            reason: 'The function must be called with one arguments "text" containing the message text to add.'
+        }, 500);
     }
     if (!context.auth) {
-        // Throwing an HttpsError so that the client gets the error details.
-        throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
-            'while authenticated.');
+        return handlers_1.Handlers.triggerAuthorizationError();
     }
-    admin.database().ref('/chat_members/' + chatId + '/' + context.auth.uid).once('value', (snapshot) => {
-        if (!snapshot.exists()) {
-            throw new functions.https.HttpsError('failed-precondition', 'The user must be a member of the chat.');
-        }
-    });
-    admin.database().ref('/chat_members/' + chatId).once('value', (snapshot) => {
-        console.log('snapshot.numChildren' + snapshot.numChildren);
-        snapshot.forEach((childSnapshot) => {
-            console.log(childSnapshot.key);
-            return true;
+    const { uid } = context.auth;
+    const timestamp = (new Date()).getTime();
+    const databaseReference = (path) => admin.database().ref(path);
+    const recipientUID = data.recipient_uid;
+    let chatID;
+    const previewObject = {
+        last_message: data.message,
+        unread_message_count: 0,
+        sender_name: data.sender_name,
+        sender_uid: data.sender_uid,
+        timestamp
+    };
+    const contactHasExistingChat = () => {
+        databaseReference(`existing_chats/${uid}`).once('value').then(chats => {
+            const chatsSnapshot = chats.val();
+            const snapshotContainsUserID = () => {
+                const snapshotChatIDs = Object.keys(chatsSnapshot);
+                return snapshotChatIDs.length && snapshotChatIDs.indexOf(data.contact_uid) !== -1;
+            };
+            if (snapshotContainsUserID) {
+                chatID = chatsSnapshot[data.contact_uid];
+            }
+            return chatsSnapshot && snapshotContainsUserID;
         });
-    });
-    return admin.database().ref('/messages').push({
-        message: message,
-        sender_uid: uid,
-        sender_name: sender_name,
-        timestamp: timestamp,
-    }).then(() => {
-        console.log('New Message written');
-        // Returning the sanitized message to the client.
-        return { message: message };
-    });
-    // [END returnMessageAsync]
-    //   .catch((error) => {
-    //     // Re-throwing the error as an HttpsError so that the client gets the error details.
-    //     throw new functions.https.HttpsError('unknown', error.message, error);
-    //   });
-    // [END_EXCLUDE]
-};
-// [END messageFunctionTrigger]
+    };
+    const addNewContactToExistingChats = () => {
+        const updateSenderChatList = databaseReference(`existing_chats/${uid}`).update({
+            [recipientUID]: chatID
+        });
+        const updateRecipientChatList = admin.database().ref(`existing_chats/${recipientUID}`).update({
+            [uid]: chatID
+        });
+        return Promise.all([updateSenderChatList, updateRecipientChatList]);
+    };
+    const createNewChatPreview = () => {
+        return databaseReference(`chat_preview/${uid}`).push(previewObject).then(key => {
+            chatID = key;
+            databaseReference(`chat_preview/${uid}/${key}`).update(previewObject);
+        });
+    };
+    const updateExistingChatPreview = () => {
+        return databaseReference(`chat_preview/${uid}/${chatID}`).update({
+            last_message: data.message,
+            unread_message_count: 0,
+            sender_name: data.sender_name,
+            sender_uid: data.sender_uid,
+            timestamp
+        });
+    };
+    const addChatMembers = () => {
+        return databaseReference(`chat_members/${chatID}`).update({
+            uid: true,
+            recipientUID: true
+        });
+    };
+    if (contactHasExistingChat) {
+        try {
+            yield updateExistingChatPreview();
+            return handlers_1.Handlers.success('Chat preview updated', {
+                chat_id: chatID
+            }, 200);
+        }
+        catch (error) {
+            return handlers_1.Handlers.error('Could not create chat', error, 500);
+        }
+    }
+    else {
+        try {
+            yield addChatMembers();
+            yield addNewContactToExistingChats();
+            yield createNewChatPreview();
+            return handlers_1.Handlers.success('New chat was successfully created', {
+                chat_id: chatID
+            }, 200);
+        }
+        catch (error) {
+            return handlers_1.Handlers.error('Could not create chat', error, 500);
+        }
+    }
+});
 //# sourceMappingURL=sendMessage.js.map

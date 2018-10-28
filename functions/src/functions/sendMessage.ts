@@ -1,60 +1,107 @@
-import { DataSnapshot } from "firebase-functions/lib/providers/database";
+import { Handlers } from './handlers'
 
-export default (functions, admin) => (data, context) => {
+export default (functions, admin) => async (data, context) => {
     const message = data.message;
-    const sender_name = data.sender_name
-    const timestamp = data.timestamp
-    const chatId = data.chat_id
-
-    const uid = context.auth.uid;
 
     // Validations and security
     if (!(typeof message === 'string') || message.length === 0) {
-        // Throwing an HttpsError so that the client gets the error details.
-        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with ' +
-            'one arguments "text" containing the message text to add.');
+        return Handlers.error('invalid-argument', {
+          reason: 'The function must be called with one arguments "text" containing the message text to add.'
+        }, 500);
     }
 
     if (!context.auth) {
-        // Throwing an HttpsError so that the client gets the error details.
-        throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
-            'while authenticated.');
+      return Handlers.triggerAuthorizationError()
     }
+  
+    const { uid } = context.auth
+    const timestamp = (new Date()).getTime()
+    const databaseReference = (path: string) => admin.database().ref(path)
+    const recipientUID = data.recipient_uid
+    let chatID
+  
+    const previewObject = {
+      last_message: data.message,
+      unread_message_count: 0,
+      sender_name: data.sender_name,
+      sender_uid: data.sender_uid,
+      timestamp
+    }
+  
+    const contactHasExistingChat = () => {
+      databaseReference(`existing_chats/${uid}`).once('value').then(chats => {
+        const chatsSnapshot = chats.val()
+  
+        const snapshotContainsUserID = () => {
+          const snapshotChatIDs = Object.keys(chatsSnapshot)
+          return snapshotChatIDs.length && snapshotChatIDs.indexOf(data.contact_uid) !== -1 
+        }
+  
+        if (snapshotContainsUserID) {
+          chatID = chatsSnapshot[data.contact_uid]
+        }
+  
+        return chatsSnapshot && snapshotContainsUserID
+      })
+    }
+    
+    const addNewContactToExistingChats = () => {
+      const updateSenderChatList = databaseReference(`existing_chats/${uid}`).update({
+        [recipientUID]: chatID
+      })
+  
+      const updateRecipientChatList = admin.database().ref(`existing_chats/${recipientUID}`).update({
+        [uid]: chatID
+      })
+  
+      return Promise.all([updateSenderChatList, updateRecipientChatList])
+    }
+  
+    const createNewChatPreview = () => {
+      return databaseReference(`chat_preview/${uid}`).push(previewObject).then(key => {
+        chatID = key
+        databaseReference(`chat_preview/${uid}/${key}`).update(previewObject)
+      })
+    }
+  
+    const updateExistingChatPreview = () => {
+      return databaseReference(`chat_preview/${uid}/${chatID}`).update({
+        last_message: data.message,
+        unread_message_count: 0,
+        sender_name: data.sender_name,
+        sender_uid: data.sender_uid,
+        timestamp
+      })
+    }
+  
+    const addChatMembers = () => {
+      return databaseReference(`chat_members/${chatID}`).update({
+        uid: true,
+        recipientUID: true
+      })
+    }
+  
+    if (contactHasExistingChat) {
+      try {
+        await updateExistingChatPreview()
 
-    admin.database().ref('/chat_members/' + chatId + '/' + context.auth.uid) .once('value', (snapshot:DataSnapshot) => {
-      if (!snapshot.exists()) { 
-        throw new functions.https.HttpsError('failed-precondition', 'The user must be a member of the chat.');
+        return Handlers.success('Chat preview updated', {
+          chat_id: chatID
+        }, 200)
+      } catch(error) {
+        return Handlers.error('Could not create chat', error, 500)
       }
-  });
-
-
-
-
-    admin.database().ref('/chat_members/'+ chatId).once('value', (snapshot:DataSnapshot) => {
-        console.log('snapshot.numChildren' + snapshot.numChildren);
-        snapshot.forEach((childSnapshot:DataSnapshot) => {
-                  console.log(childSnapshot.key)
-                  return true;
-                });
-    });
-
-    return admin.database().ref('/messages').push({
-      message: message,
-      sender_uid: uid, 
-      sender_name: sender_name,
-      timestamp: timestamp,
-
-      
-    }).then(() => {
-      console.log('New Message written');
-      // Returning the sanitized message to the client.
-      return { message: message };
-    })
-    // [END returnMessageAsync]
-  //   .catch((error) => {
-  //     // Re-throwing the error as an HttpsError so that the client gets the error details.
-  //     throw new functions.https.HttpsError('unknown', error.message, error);
-  //   });
-    // [END_EXCLUDE]
-  };
-  // [END messageFunctionTrigger]
+    } else {
+      try {
+        await addChatMembers()
+        await addNewContactToExistingChats()
+        await createNewChatPreview()
+  
+        return Handlers.success('New chat was successfully created', {
+          chat_id: chatID
+        }, 200)
+      } catch(error) {
+        return Handlers.error('Could not create chat', error, 500)
+      }
+    }
+  }
