@@ -9,9 +9,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const handlers_1 = require("./handlers");
+const sendNotification_1 = require("./sendNotification");
 exports.default = (functions, admin) => (data, context) => __awaiter(this, void 0, void 0, function* () {
-    const message = data.message;
-    // Validations and security
+    const { message } = data;
     if (!(typeof message === 'string') || message.length === 0) {
         return handlers_1.Handlers.error('invalid-argument', {
             reason: 'The function must be called with one arguments "text" containing the message text to add.'
@@ -20,7 +20,7 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
     if (!context.auth) {
         return handlers_1.Handlers.triggerAuthorizationError();
     }
-    const { uid } = context.auth;
+    const { uid, displayName } = context.auth;
     const timestamp = (new Date()).getTime();
     const databaseReference = (path) => admin.database().ref(path);
     const recipientUID = data.recipient_uid;
@@ -28,76 +28,92 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
     const previewObject = {
         last_message: data.message,
         unread_message_count: 0,
-        sender_name: data.sender_name,
-        sender_uid: data.sender_uid,
+        sender_name: displayName || 'Unknown',
+        sender_uid: uid,
+        status: 'sent',
         timestamp
     };
     const contactHasExistingChat = () => {
-        databaseReference(`existing_chats/${uid}`).once('value').then(chats => {
-            const chatsSnapshot = chats.val();
-            const snapshotContainsUserID = () => {
-                const snapshotChatIDs = Object.keys(chatsSnapshot);
-                return snapshotChatIDs.length && snapshotChatIDs.indexOf(data.contact_uid) !== -1;
-            };
-            if (snapshotContainsUserID) {
-                chatID = chatsSnapshot[data.contact_uid];
-            }
-            return chatsSnapshot && snapshotContainsUserID;
+        return new Promise((resolve, reject) => {
+            return databaseReference(`existing_chats/${uid}`).once('value').then(chats => {
+                const chatsSnapshot = chats.val();
+                const snapshotContainsUserID = () => {
+                    if (chatsSnapshot) {
+                        const snapshotChatIDs = Object.keys(chatsSnapshot);
+                        return snapshotChatIDs.length && snapshotChatIDs.indexOf(data.recipient_uid) !== -1;
+                    }
+                    return false;
+                };
+                const chatExists = snapshotContainsUserID();
+                if (chatExists) {
+                    chatID = chatsSnapshot[data.recipient_uid];
+                }
+                resolve(chatsSnapshot && chatExists);
+            }).catch(error => {
+                reject(error);
+            });
         });
     };
-    const addNewContactToExistingChats = () => {
-        const updateSenderChatList = databaseReference(`existing_chats/${uid}`).update({
-            [recipientUID]: chatID
-        });
-        const updateRecipientChatList = admin.database().ref(`existing_chats/${recipientUID}`).update({
-            [uid]: chatID
-        });
-        return Promise.all([updateSenderChatList, updateRecipientChatList]);
-    };
+    const addNewContactToExistingChats = () => __awaiter(this, void 0, void 0, function* () {
+        try {
+            yield databaseReference(`existing_chats/${uid}`).update({
+                [recipientUID]: chatID
+            });
+            return databaseReference(`existing_chats/${recipientUID}`).update({
+                [uid]: chatID
+            });
+        }
+        catch (error) {
+            handlers_1.Handlers.error('Could not add contact to chat', {
+                reason: 'Unknown'
+            }, 500);
+        }
+    });
     const createNewChatPreview = () => {
-        return databaseReference(`chat_preview/${uid}`).push(previewObject).then(key => {
-            chatID = key;
-            databaseReference(`chat_preview/${uid}/${key}`).update(previewObject);
+        return databaseReference(`chat_preview/${uid}`).push(previewObject).then(snapshot => {
+            chatID = snapshot.key;
+            return databaseReference(`chat_preview/${recipientUID}/${chatID}`).update(previewObject);
         });
     };
     const updateExistingChatPreview = () => {
-        return databaseReference(`chat_preview/${uid}/${chatID}`).update({
-            last_message: data.message,
-            unread_message_count: 0,
-            sender_name: data.sender_name,
-            sender_uid: data.sender_uid,
-            timestamp
-        });
+        return databaseReference(`chat_preview/${uid}/${chatID}`).update(previewObject);
     };
     const addChatMembers = () => {
         return databaseReference(`chat_members/${chatID}`).update({
-            uid: true,
-            recipientUID: true
+            [uid]: true,
+            [recipientUID]: true
         });
     };
-    if (contactHasExistingChat) {
-        try {
-            yield updateExistingChatPreview();
-            return handlers_1.Handlers.success('Chat preview updated', {
-                chat_id: chatID
-            }, 200);
+    try {
+        const chatExists = yield contactHasExistingChat();
+        if (chatExists) {
+            try {
+                yield updateExistingChatPreview();
+                sendNotification_1.NotificationsService.sendNotifications(admin, uid, data.message, chatID, displayName);
+                return handlers_1.Handlers.success('Chat preview updated', {
+                    chat_id: chatID
+                }, 200);
+            }
+            catch (error) {
+                return handlers_1.Handlers.error('Could not create chat', error, 500);
+            }
         }
-        catch (error) {
-            return handlers_1.Handlers.error('Could not create chat', error, 500);
+        else {
+            try {
+                yield createNewChatPreview();
+                yield addChatMembers();
+                yield addNewContactToExistingChats();
+                return handlers_1.Handlers.success('New chat was successfully created', {
+                    chat_id: chatID
+                }, 200);
+            }
+            catch (error) {
+                return handlers_1.Handlers.error('Could not create chat', error, 500);
+            }
         }
     }
-    else {
-        try {
-            yield addChatMembers();
-            yield addNewContactToExistingChats();
-            yield createNewChatPreview();
-            return handlers_1.Handlers.success('New chat was successfully created', {
-                chat_id: chatID
-            }, 200);
-        }
-        catch (error) {
-            return handlers_1.Handlers.error('Could not create chat', error, 500);
-        }
+    catch (error) {
+        return handlers_1.Handlers.error('Could not create chat', error, 500);
     }
 });
 //# sourceMappingURL=sendMessage.js.map

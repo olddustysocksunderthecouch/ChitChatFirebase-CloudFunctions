@@ -17,10 +17,11 @@
 
 import * as functions from 'firebase-functions'
 import * as admin from 'firebase-admin'
-import { addDeviceToken, createAccount, sendMessage } from './functions'
+import { addDeviceToken, createAccount, sendMessage, createGroup } from './functions'
 
 admin.initializeApp()
 
 exports.addDeviceToken = functions.https.onCall(addDeviceToken(functions, admin))
 exports.createAccount = functions.https.onCall(createAccount(functions, admin))
 exports.sendMessage = functions.https.onCall(sendMessage(functions, admin))
+exports.createGroup = functions.https.onCall(createGroup(functions, admin))

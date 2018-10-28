@@ -3,10 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const handlers_1 = require("./handlers");
 exports.default = (functions, admin) => (data, context) => {
     const timestamp_now = (new Date()).getTime();
+    const userRef = admin.database().ref(`users/${context.auth.uid}`);
     if (!context.auth) {
         return handlers_1.Handlers.triggerAuthorizationError();
     }
-    const userRef = admin.database().ref(`users/${context.auth.uid}`);
     return userRef.once('value').then(result => {
         if (result.val()) {
             return handlers_1.Handlers.error('User account creation failed', {
