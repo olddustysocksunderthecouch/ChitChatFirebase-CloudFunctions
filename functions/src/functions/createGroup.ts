@@ -1,38 +1,40 @@
 import { Handlers } from './handlers'
 
 export default (functions, admin) => async (data, context) => {
+
+  if (!context.auth) {
+		return Handlers.triggerAuthorizationError()
+  }
+
   const databaseReference = (path: string) => admin.database().ref(path)
   const { uid, displayName } = context.auth
   const { uids } = data
   const timestamp: number = (new Date()).getTime()
 
-	if (!context.auth) {
-		return Handlers.triggerAuthorizationError()
-  }
-
   const previewObject = {
-    last_message: data.message,
+    last_message: `${displayName} just created a group`,
     unread_message_count: 0,
     sender_name: data.group_name,
     sender_uid: uid,
     status: 'sent',
-    timestamp
+    timestamp,
+    is_group: true
   }
 
-  const createGroupNode = (chatId: string) => {
+  const createGroupNode = (chatId: string): Promise<any> => {
     return databaseReference(`groups/${chatId}`).update({
       title: data.group_name,
       date_created: timestamp,
-      creator: displayName,
+      creator: `displayName`,
       profile_picture: data.profile_picture
     })
   }
 
-  const addChatMembers = (userIDs: Array<string>, chatId: string): Promise<any> => {
+  const addChatMembers = (userIDs: any, chatId: string): Promise<any> => {
     return databaseReference(`chat_members/${chatId}`).update(userIDs)
   }
 
-  const createNewChatPreviewCreator = (): Promise<any> => {
+  const createNewChatPreviewForGroupCreator = (): Promise<any> => {
     return databaseReference(`chat_preview/${uid}`).push(previewObject)
   }
 
@@ -40,24 +42,18 @@ export default (functions, admin) => async (data, context) => {
     return databaseReference(`chat_preview/${userID}/${chatId}`).update(previewObject)
   }
 
-  const creatorChatPreview = await createNewChatPreviewCreator()
-  const chatID = creatorChatPreview.key
-
-  const mappedIDs: Array<any> = uids.map(async (userID) => {
-    try {
-      await createNewChatPreview(userID, chatID)
-    } catch(error) {
-      console.error(error)
-    }
-
-    return {
-      userID: true
-    }
-  })
-
   try {
+    const createChatPreview = await createNewChatPreviewForGroupCreator()
+    const chatID: string = createChatPreview.key
+    const uidsObject = {}
+
+    uids.forEach(async (userID: string) => {
+      await createNewChatPreview(userID, chatID)
+      uidsObject[userID] = true
+    })
+
     await createGroupNode(chatID)
-    await addChatMembers(mappedIDs, chatID)
+    await addChatMembers(uidsObject, chatID)
     return Handlers.success('Group successfully created', null, 204)
   } catch (error) {
     return Handlers.error('Could not add members', error, 500)

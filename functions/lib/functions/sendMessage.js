@@ -25,6 +25,7 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
     const databaseReference = (path) => admin.database().ref(path);
     const recipientUID = data.recipient_uid;
     let chatID;
+    let chatMembers;
     const previewObject = {
         last_message: data.message,
         unread_message_count: 0,
@@ -38,8 +39,10 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
             return databaseReference(`existing_chats/${uid}`).once('value').then(chats => {
                 const chatsSnapshot = chats.val();
                 const snapshotContainsUserID = () => {
+                    console.log(chatsSnapshot);
                     if (chatsSnapshot) {
                         const snapshotChatIDs = Object.keys(chatsSnapshot);
+                        console.log(snapshotChatIDs);
                         return snapshotChatIDs.length && snapshotChatIDs.indexOf(data.recipient_uid) !== -1;
                     }
                     return false;
@@ -72,11 +75,11 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
     const createNewChatPreview = () => {
         return databaseReference(`chat_preview/${uid}`).push(previewObject).then(snapshot => {
             chatID = snapshot.key;
-            return databaseReference(`chat_preview/${recipientUID}/${chatID}`).update(previewObject);
+            return databaseReference(`chat_preview/${recipientUID}/${chatID}`).update(Object.assign({}, previewObject, { is_group: false }));
         });
     };
-    const updateExistingChatPreview = () => {
-        return databaseReference(`chat_preview/${uid}/${chatID}`).update(previewObject);
+    const updateExistingChatPreview = (userId) => {
+        return databaseReference(`chat_preview/${userId}/${chatID}`).update(previewObject);
     };
     const addChatMembers = () => {
         return databaseReference(`chat_members/${chatID}`).update({
@@ -84,11 +87,41 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
             [recipientUID]: true
         });
     };
+    const chatIDExists = () => {
+        return new Promise((resolve, reject) => {
+            return databaseReference(`chat_members/${data.chat_id}`).once('value').then(members => {
+                const membersSnapshot = members.val();
+                const snapshotContainsUserID = () => {
+                    if (membersSnapshot) {
+                        const snapshotChatIDs = Object.keys(membersSnapshot);
+                        chatMembers = snapshotChatIDs;
+                        return snapshotChatIDs.length && snapshotChatIDs.indexOf(uid) !== -1;
+                    }
+                    return false;
+                };
+                const chatExists = snapshotContainsUserID();
+                if (chatExists) {
+                    chatID = data.chat_id;
+                }
+                resolve(membersSnapshot && chatExists);
+            }).catch(error => {
+                reject(error);
+            });
+        });
+    };
     try {
-        const chatExists = yield contactHasExistingChat();
+        let chatExists;
+        if (data.chat_id) {
+            chatExists = yield chatIDExists();
+        }
+        else {
+            chatExists = yield contactHasExistingChat();
+        }
         if (chatExists) {
             try {
-                yield updateExistingChatPreview();
+                chatMembers.forEach((userId) => __awaiter(this, void 0, void 0, function* () {
+                    yield updateExistingChatPreview(userId);
+                }));
                 sendNotification_1.NotificationsService.sendNotifications(admin, uid, data.message, chatID, displayName);
                 return handlers_1.Handlers.success('Chat preview updated', {
                     chat_id: chatID

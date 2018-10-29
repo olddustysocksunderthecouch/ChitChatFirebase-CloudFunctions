@@ -18,46 +18,41 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
         return handlers_1.Handlers.triggerAuthorizationError();
     }
     const previewObject = {
-        last_message: data.message,
+        last_message: `${displayName} just created a group`,
         unread_message_count: 0,
         sender_name: data.group_name,
         sender_uid: uid,
         status: 'sent',
-        timestamp
+        timestamp,
+        is_group: true
     };
     const createGroupNode = (chatId) => {
         return databaseReference(`groups/${chatId}`).update({
             title: data.group_name,
             date_created: timestamp,
-            creator: displayName,
+            creator: `displayName`,
             profile_picture: data.profile_picture
         });
     };
     const addChatMembers = (userIDs, chatId) => {
         return databaseReference(`chat_members/${chatId}`).update(userIDs);
     };
-    const createNewChatPreviewCreator = () => {
+    const createNewChatPreviewForGroupCreator = () => {
         return databaseReference(`chat_preview/${uid}`).push(previewObject);
     };
     const createNewChatPreview = (userID, chatId) => {
         return databaseReference(`chat_preview/${userID}/${chatId}`).update(previewObject);
     };
-    const creatorChatPreview = yield createNewChatPreviewCreator();
-    const chatID = creatorChatPreview.key;
-    const mappedIDs = uids.map((userID) => __awaiter(this, void 0, void 0, function* () {
-        try {
-            yield createNewChatPreview(userID, chatID);
-        }
-        catch (error) {
-            console.error(error);
-        }
-        return {
-            userID: true
-        };
-    }));
     try {
+        const createChatPreview = yield createNewChatPreviewForGroupCreator();
+        const chatID = createChatPreview.key;
+        const uidsObject = {};
+        uids.forEach((userID) => __awaiter(this, void 0, void 0, function* () {
+            yield createNewChatPreview(userID, chatID);
+            uidsObject[userID] = true;
+        }));
         yield createGroupNode(chatID);
-        yield addChatMembers(mappedIDs, chatID);
+        yield addChatMembers(uidsObject, chatID);
         return handlers_1.Handlers.success('Group successfully created', null, 204);
     }
     catch (error) {

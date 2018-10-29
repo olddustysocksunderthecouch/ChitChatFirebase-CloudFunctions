@@ -23,4 +23,5 @@ exports.addDeviceToken = functions.https.onCall(functions_1.addDeviceToken(funct
 exports.createAccount = functions.https.onCall(functions_1.createAccount(functions, admin));
 exports.sendMessage = functions.https.onCall(functions_1.sendMessage(functions, admin));
 exports.createGroup = functions.https.onCall(functions_1.createGroup(functions, admin));
+exports.addUnreadMessage = functions.database.ref('/messages/{chatID}/{messageID}').onWrite(functions_1.addUnreadMessage);
 //# sourceMappingURL=index.js.map

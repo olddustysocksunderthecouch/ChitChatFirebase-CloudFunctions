@@ -8,4 +8,6 @@ const addDeviceToken_1 = require("./addDeviceToken");
 exports.addDeviceToken = addDeviceToken_1.default;
 const createGroup_1 = require("./createGroup");
 exports.createGroup = createGroup_1.default;
+const addUnreadMessage_1 = require("./addUnreadMessage");
+exports.addUnreadMessage = addUnreadMessage_1.addUnreadMessage;
 //# sourceMappingURL=index.js.map

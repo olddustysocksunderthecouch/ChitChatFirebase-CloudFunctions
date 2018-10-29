@@ -1,5 +1,7 @@
+import { ErrorResponse, SuccessResponse } from '../../interfaces/responses.model'
+
 export const Handlers = {
-  error: (message, error, code) => {
+  error: (message: string, error: any, code: number): ErrorResponse => {
     return {
       status: 'error',
       message,
@@ -7,7 +9,7 @@ export const Handlers = {
       code
     }
   },
-  success: (message, body, code) => {
+  success: (message: string, body: any, code: number): SuccessResponse => {
     return {
       status: 'success',
       message,

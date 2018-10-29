@@ -2,6 +2,11 @@ import { Handlers } from './handlers'
 import { NotificationsService } from './sendNotification'
 
 export default (functions, admin) => async (data, context) => {
+
+  if (!context.auth) {
+    return Handlers.triggerAuthorizationError()
+  }
+
   const { message } = data
 
   if (!(typeof message === 'string') || message.length === 0) {
@@ -10,15 +15,12 @@ export default (functions, admin) => async (data, context) => {
     }, 500)
   }
 
-  if (!context.auth) {
-    return Handlers.triggerAuthorizationError()
-  }
-
   const { uid, displayName } = context.auth
-  const timestamp = (new Date()).getTime()
+  const timestamp: number = (new Date()).getTime()
   const databaseReference = (path: string) => admin.database().ref(path)
-  const recipientUID = data.recipient_uid
-  let chatID
+  const recipientUID: string = data.recipient_uid
+  let chatID: string
+  let chatMembers: Array<string>
 
   const previewObject = {
     last_message: data.message,
@@ -35,8 +37,10 @@ export default (functions, admin) => async (data, context) => {
         const chatsSnapshot = chats.val()
 
         const snapshotContainsUserID = () => {
+          console.log(chatsSnapshot)
           if (chatsSnapshot) {
             const snapshotChatIDs = Object.keys(chatsSnapshot)
+            console.log(snapshotChatIDs)
             return snapshotChatIDs.length && snapshotChatIDs.indexOf(data.recipient_uid) !== -1 
           }
 
@@ -75,12 +79,15 @@ export default (functions, admin) => async (data, context) => {
   const createNewChatPreview = (): Promise<any> => {
     return databaseReference(`chat_preview/${uid}`).push(previewObject).then(snapshot => {
       chatID = snapshot.key
-      return databaseReference(`chat_preview/${recipientUID}/${chatID}`).update(previewObject)
+      return databaseReference(`chat_preview/${recipientUID}/${chatID}`).update({
+        ...previewObject,
+        is_group: false
+      })
     })
   }
 
-  const updateExistingChatPreview = (): Promise<any> => {
-    return databaseReference(`chat_preview/${uid}/${chatID}`).update(previewObject)
+  const updateExistingChatPreview = (userId): Promise<any> => {
+    return databaseReference(`chat_preview/${userId}/${chatID}`).update(previewObject)
   }
 
   const addChatMembers = (): Promise<any> => {
@@ -90,12 +97,49 @@ export default (functions, admin) => async (data, context) => {
     })
   }
 
+  const chatIDExists = (): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      return databaseReference(`chat_members/${data.chat_id}`).once('value').then(members => {
+        const membersSnapshot = members.val()
+
+        const snapshotContainsUserID = () => {
+          if (membersSnapshot) {
+            const snapshotChatIDs = Object.keys(membersSnapshot)
+            chatMembers = snapshotChatIDs
+            return snapshotChatIDs.length && snapshotChatIDs.indexOf(uid) !== -1 
+          }
+
+          return false   
+        }
+
+        const chatExists = snapshotContainsUserID()
+        
+        if (chatExists) {
+          chatID = data.chat_id
+        }
+
+        resolve(membersSnapshot && chatExists)
+      }).catch(error => {
+        reject(error)
+      })
+    })
+  }
+
   try {
-    const chatExists = await contactHasExistingChat()
+    let chatExists
+
+    if (data.chat_id) {
+      chatExists = await chatIDExists()
+    } else {
+      chatExists = await contactHasExistingChat()
+    }
 
     if (chatExists) {
       try {
-        await updateExistingChatPreview()
+        chatMembers.forEach(async (userId) => {
+          await updateExistingChatPreview(userId)
+        })
+        
         NotificationsService.sendNotifications(admin, uid, data.message, chatID, displayName)
   
         return Handlers.success('Chat preview updated', {

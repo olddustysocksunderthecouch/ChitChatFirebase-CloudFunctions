@@ -1,12 +1,13 @@
 import { Handlers } from './handlers'
 
 export default (functions, admin) => (data, context) => {
-  const timestamp_now = (new Date()).getTime()
-  const userRef = admin.database().ref(`users/${context.auth.uid}`)
 
-	if (!context.auth) {
+  if (!context.auth) {
 		return Handlers.triggerAuthorizationError()
   }
+
+  const timestamp_now: number = (new Date()).getTime()
+  const userRef = admin.database().ref(`users/${context.auth.uid}`)
 
   return userRef.once('value').then(result => {
     if (result.val()) {
@@ -18,7 +19,7 @@ export default (functions, admin) => (data, context) => {
     return userRef.update({
       ...data,
       date_joined: timestamp_now
-    }).then(res => {
+    }).then(() => {
       return Handlers.success('User Account Created', {}, 204)
     })
   })
