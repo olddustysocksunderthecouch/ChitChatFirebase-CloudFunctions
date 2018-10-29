@@ -6,3 +6,6 @@ functions/node_modules/
 
 # MAC
 .DS_STORE
+
+# BUILD
+functions/lib/
