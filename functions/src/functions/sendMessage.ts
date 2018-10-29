@@ -145,10 +145,9 @@ export default (functions, admin) => async (data, context) => {
       try {
         chatMembers.forEach(async (userId) => {
           await updateExistingChatPreview(userId)
+          NotificationsService.sendNotifications(admin, userId, data.message, chatID, displayName)
         })
-        
-        NotificationsService.sendNotifications(admin, uid, data.message, chatID, displayName)
-  
+
         return Handlers.success('Chat preview updated', {
           chat_id: chatID
         }, 200)

@@ -1,9 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const handlers_1 = require("./handlers");
+const validators_1 = require("./validators");
 exports.default = (functions, admin) => (data, context) => {
     if (!context.auth) {
         return handlers_1.Handlers.triggerAuthorizationError();
+    }
+    const { exists, minLength } = validators_1.Validators;
+    if (!exists(data)) {
+        return handlers_1.Handlers.error('Bad request', null, 400);
     }
     const timestamp_now = (new Date()).getTime();
     const userRef = admin.database().ref(`users/${context.auth.uid}`);

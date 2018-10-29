@@ -9,12 +9,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const handlers_1 = require("./handlers");
+const validators_1 = require("./validators");
 const admin = require('firebase-admin');
 exports.addUnreadMessage = (snapshot, context) => __awaiter(this, void 0, void 0, function* () {
     if (!context.auth) {
         return handlers_1.Handlers.triggerAuthorizationError();
     }
     const { chatID, messageID } = context.params;
+    const { exists, minLength } = validators_1.Validators;
+    if (!exists(chatID) || !minLength(chatID, 10) || !exists(messageID) || !minLength(messageID, 10)) {
+        return handlers_1.Handlers.error('Bad request', null, 400);
+    }
     const databaseReference = (path) => admin.database().ref(path);
     try {
         yield databaseReference(`messages_unread/${chatID}`).update({

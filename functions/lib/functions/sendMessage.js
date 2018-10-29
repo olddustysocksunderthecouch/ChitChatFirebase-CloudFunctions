@@ -10,16 +10,21 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const handlers_1 = require("./handlers");
 const sendNotification_1 = require("./sendNotification");
+const validators_1 = require("./validators");
 exports.default = (functions, admin) => (data, context) => __awaiter(this, void 0, void 0, function* () {
     if (!context.auth) {
         return handlers_1.Handlers.triggerAuthorizationError();
     }
-    const { message } = data;
-    if (!(typeof message === 'string') || message.length === 0) {
+    const { exists, minLength, isType } = validators_1.Validators;
+    if (!exists(data.chat_id) || !minLength(data.chat_id, 10)) {
+        return handlers_1.Handlers.error('Bad request', null, 400);
+    }
+    if (!exists(data.message) || isType(data.message, 'string') || minLength(data.message, 1)) {
         return handlers_1.Handlers.error('invalid-argument', {
             reason: 'The function must be called with one arguments "text" containing the message text to add.'
         }, 500);
     }
+    const { message } = data;
     const { uid, displayName } = context.auth;
     const timestamp = (new Date()).getTime();
     const databaseReference = (path) => admin.database().ref(path);
@@ -121,8 +126,8 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
             try {
                 chatMembers.forEach((userId) => __awaiter(this, void 0, void 0, function* () {
                     yield updateExistingChatPreview(userId);
+                    sendNotification_1.NotificationsService.sendNotifications(admin, userId, data.message, chatID, displayName);
                 }));
-                sendNotification_1.NotificationsService.sendNotifications(admin, uid, data.message, chatID, displayName);
                 return handlers_1.Handlers.success('Chat preview updated', {
                     chat_id: chatID
                 }, 200);
