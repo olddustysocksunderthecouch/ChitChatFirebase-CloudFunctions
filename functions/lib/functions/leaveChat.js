@@ -10,13 +10,12 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const handlers_1 = require("./handlers");
 exports.default = (functions, admin) => (data, context) => __awaiter(this, void 0, void 0, function* () {
-    const databaseReference = (path) => admin.database().ref(path);
-    const { uid, displayName } = context.auth;
-    const chatID = data.chat_id;
-    const timestamp = (new Date()).getTime();
     if (!context.auth) {
         return handlers_1.Handlers.triggerAuthorizationError();
     }
+    const databaseReference = (path) => admin.database().ref(path);
+    const { uid } = context.auth;
+    const chatID = data.chat_id;
     const chatMembers = () => {
         return databaseReference(`chat_members/${chatID}`).once('value');
     };

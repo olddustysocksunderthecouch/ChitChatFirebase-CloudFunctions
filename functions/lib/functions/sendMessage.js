@@ -11,14 +11,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const handlers_1 = require("./handlers");
 const sendNotification_1 = require("./sendNotification");
 exports.default = (functions, admin) => (data, context) => __awaiter(this, void 0, void 0, function* () {
+    if (!context.auth) {
+        return handlers_1.Handlers.triggerAuthorizationError();
+    }
     const { message } = data;
     if (!(typeof message === 'string') || message.length === 0) {
         return handlers_1.Handlers.error('invalid-argument', {
             reason: 'The function must be called with one arguments "text" containing the message text to add.'
         }, 500);
-    }
-    if (!context.auth) {
-        return handlers_1.Handlers.triggerAuthorizationError();
     }
     const { uid, displayName } = context.auth;
     const timestamp = (new Date()).getTime();

@@ -2,11 +2,11 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const handlers_1 = require("./handlers");
 exports.default = (functions, admin) => (data, context) => {
-    const databaseReference = (path) => admin.database().ref(path);
-    const { uid } = context.auth;
     if (!context.auth) {
         return handlers_1.Handlers.triggerAuthorizationError();
     }
+    const databaseReference = (path) => admin.database().ref(path);
+    const { uid } = context.auth;
     return databaseReference(`device_tokens/${uid}`).update({
         [data.token]: true
     }).then(() => {

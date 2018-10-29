@@ -10,13 +10,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const handlers_1 = require("./handlers");
 exports.default = (functions, admin) => (data, context) => __awaiter(this, void 0, void 0, function* () {
+    if (!context.auth) {
+        return handlers_1.Handlers.triggerAuthorizationError();
+    }
     const databaseReference = (path) => admin.database().ref(path);
     const { uid, displayName } = context.auth;
     const { uids } = data;
     const timestamp = (new Date()).getTime();
-    if (!context.auth) {
-        return handlers_1.Handlers.triggerAuthorizationError();
-    }
     const previewObject = {
         last_message: `${displayName} just created a group`,
         unread_message_count: 0,

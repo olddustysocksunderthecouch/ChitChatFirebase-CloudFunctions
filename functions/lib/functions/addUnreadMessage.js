@@ -10,9 +10,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const handlers_1 = require("./handlers");
 const admin = require('firebase-admin');
-exports.addUnreadMessage = (snapshot, event) => __awaiter(this, void 0, void 0, function* () {
-    console.log(event);
-    const { chatID, messageID } = event.params;
+exports.addUnreadMessage = (snapshot, context) => __awaiter(this, void 0, void 0, function* () {
+    if (!context.auth) {
+        return handlers_1.Handlers.triggerAuthorizationError();
+    }
+    const { chatID, messageID } = context.params;
     const databaseReference = (path) => admin.database().ref(path);
     try {
         yield databaseReference(`messages_unread/${chatID}`).update({
