@@ -1,5 +1,6 @@
 import { Handlers } from './handlers'
 import { NotificationsService } from './sendNotification'
+import { Validators } from './validators'
 
 export default (functions, admin) => async (data, context) => {
 
@@ -7,13 +8,19 @@ export default (functions, admin) => async (data, context) => {
     return Handlers.triggerAuthorizationError()
   }
 
-  const { message } = data
+  const { exists, minLength, isType } = Validators
+  
+  if(!exists(data.chat_id) || !minLength(data.chat_id, 10)) {
+    return Handlers.error('Bad request', null, 400)
+  }
 
-  if (!(typeof message === 'string') || message.length === 0) {
+  if (!exists(data.message) || isType(data.message, 'string') || minLength(data.message, 1)) {
     return Handlers.error('invalid-argument', {
       reason: 'The function must be called with one arguments "text" containing the message text to add.'
     }, 500)
   }
+
+  const { message } = data
 
   const { uid, displayName } = context.auth
   const timestamp: number = (new Date()).getTime()

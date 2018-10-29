@@ -1,9 +1,16 @@
 import { Handlers } from './handlers'
+import { Validators } from './validators'
 
 export default (functions, admin) => async (data, context) => {
 
   if (!context.auth) {
 		return Handlers.triggerAuthorizationError()
+  }
+
+  const { exists, minLength } = Validators
+
+  if(!minLength(data.uids, 1) || !exists(data.group_name) || !minLength(data.group_name, 2) || !exists(data.profile_picture)) {
+    return Handlers.error('Bad request', null, 400)
   }
 
   const databaseReference = (path: string) => admin.database().ref(path)

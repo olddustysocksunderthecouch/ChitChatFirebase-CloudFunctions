@@ -1,4 +1,4 @@
-import { UserStatus } from './user-status'
+import { UserStatus } from './user-status.model'
 
 export interface User {
     display_name: string;
