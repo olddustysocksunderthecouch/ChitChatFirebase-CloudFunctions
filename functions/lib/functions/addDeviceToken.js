@@ -17,7 +17,7 @@ exports.default = (functions, admin) => (data, context) => {
     }).then(() => {
         return handlers_1.Handlers.success('Device token successfully added', {}, 204);
     }).catch(error => {
-        return handlers_1.Handlers.error('Could not create user', error, 500);
+        return handlers_1.Handlers.error('Could not add device token', error, 500);
     });
 };
 //# sourceMappingURL=addDeviceToken.js.map

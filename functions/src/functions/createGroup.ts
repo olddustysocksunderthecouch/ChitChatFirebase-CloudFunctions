@@ -14,8 +14,9 @@ export default (functions, admin) => async (data, context) => {
   }
 
   const databaseReference = (path: string) => admin.database().ref(path)
-  const { uid, displayName } = context.auth
+  const { uid } = context.auth
   const { uids } = data
+  const displayName = context.auth.token.name
   const timestamp: number = (new Date()).getTime()
 
   const previewObject = {
@@ -53,6 +54,7 @@ export default (functions, admin) => async (data, context) => {
     const createChatPreview = await createNewChatPreviewForGroupCreator()
     const chatID: string = createChatPreview.key
     const uidsObject = {}
+    uids.push(uid)
 
     uids.forEach(async (userID: string) => {
       await createNewChatPreview(userID, chatID)

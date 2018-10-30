@@ -1,36 +1,32 @@
 import { Handlers } from './handlers'
 import { NotificationsService } from './sendNotification'
 import { Validators } from './validators'
+const admin = require('firebase-admin')
 
-export default (functions, admin) => async (data, context) => {
+export const sendMessage = async (snapshot, context) => {
 
   if (!context.auth) {
     return Handlers.triggerAuthorizationError()
   }
 
-  const { exists, minLength, isType } = Validators
-  
-  if(!exists(data.chat_id) || !minLength(data.chat_id, 10)) {
-    return Handlers.error('Bad request', null, 400)
-  }
+  const { chatID, messageID } = context.params
+  const { message } = context.data.val()
 
-  if (!exists(data.message) || isType(data.message, 'string') || minLength(data.message, 1)) {
+  const { exists, minLength, isType } = Validators
+
+  if (!exists(message) || !isType(message, 'string') || !minLength(message, 1)) {
     return Handlers.error('invalid-argument', {
       reason: 'The function must be called with one arguments "text" containing the message text to add.'
-    }, 500)
+    }, 400)
   }
 
-  const { message } = data
-
-  const { uid, displayName } = context.auth
+  const { uid } = context.auth
+  const displayName = context.auth.token.name
   const timestamp: number = (new Date()).getTime()
   const databaseReference = (path: string) => admin.database().ref(path)
-  const recipientUID: string = data.recipient_uid
-  let chatID: string
-  let chatMembers: Array<string>
 
   const previewObject = {
-    last_message: data.message,
+    last_message: message,
     unread_message_count: 0,
     sender_name: displayName || 'Unknown',
     sender_uid: uid,
@@ -38,94 +34,21 @@ export default (functions, admin) => async (data, context) => {
     timestamp
   }
 
-  const contactHasExistingChat = (): Promise<any> => {
-    return new Promise((resolve, reject) => {
-      return databaseReference(`existing_chats/${uid}`).once('value').then(chats => {
-        const chatsSnapshot = chats.val()
-
-        const snapshotContainsUserID = () => {
-          console.log(chatsSnapshot)
-          if (chatsSnapshot) {
-            const snapshotChatIDs = Object.keys(chatsSnapshot)
-            console.log(snapshotChatIDs)
-            return snapshotChatIDs.length && snapshotChatIDs.indexOf(data.recipient_uid) !== -1 
-          }
-
-          return false   
-        }
-
-        const chatExists = snapshotContainsUserID()
-  
-        if (chatExists) {
-          chatID = chatsSnapshot[data.recipient_uid]
-        }
-
-        resolve(chatsSnapshot && chatExists)
-      }).catch(error => {
-        reject(error)
-      })
-    })
-  }
-  
-  const addNewContactToExistingChats = async (): Promise<any> => {
-    try {
-      await databaseReference(`existing_chats/${uid}`).update({
-        [recipientUID]: chatID
-      })
-  
-      return databaseReference(`existing_chats/${recipientUID}`).update({
-        [uid]: chatID
-      })
-    } catch(error) {
-      Handlers.error('Could not add contact to chat', {
-        reason: 'Unknown'
-      }, 500)
-    }
-  }
-
-  const createNewChatPreview = (): Promise<any> => {
-    return databaseReference(`chat_preview/${uid}`).push(previewObject).then(snapshot => {
-      chatID = snapshot.key
-      return databaseReference(`chat_preview/${recipientUID}/${chatID}`).update({
-        ...previewObject,
-        is_group: false
-      })
-    })
-  }
-
   const updateExistingChatPreview = (userId): Promise<any> => {
     return databaseReference(`chat_preview/${userId}/${chatID}`).update(previewObject)
   }
 
-  const addChatMembers = (): Promise<any> => {
-    return databaseReference(`chat_members/${chatID}`).update({
-      [uid]: true,
-      [recipientUID]: true
-    })
-  }
-
-  const chatIDExists = (): Promise<any> => {
+  const getChatMembers = (): Promise<any> => {
     return new Promise((resolve, reject) => {
-      return databaseReference(`chat_members/${data.chat_id}`).once('value').then(members => {
+      return databaseReference(`chat_members/${chatID}`).once('value').then(members => {
         const membersSnapshot = members.val()
 
-        const snapshotContainsUserID = () => {
-          if (membersSnapshot) {
-            const snapshotChatIDs = Object.keys(membersSnapshot)
-            chatMembers = snapshotChatIDs
-            return snapshotChatIDs.length && snapshotChatIDs.indexOf(uid) !== -1 
-          }
-
-          return false   
+        if (membersSnapshot) {
+          const snapshotChatIDs = Object.keys(membersSnapshot)
+          return resolve(snapshotChatIDs)
         }
 
-        const chatExists = snapshotContainsUserID()
-        
-        if (chatExists) {
-          chatID = data.chat_id
-        }
-
-        resolve(membersSnapshot && chatExists)
+        return reject('No chat members found') 
       }).catch(error => {
         reject(error)
       })
@@ -133,40 +56,17 @@ export default (functions, admin) => async (data, context) => {
   }
 
   try {
-    let chatExists
+    const chatMembers = await getChatMembers() 
 
-    if (data.chat_id) {
-      chatExists = await chatIDExists()
-    } else {
-      chatExists = await contactHasExistingChat()
-    }
+    chatMembers.forEach(async (userId) => {
+      await updateExistingChatPreview(userId)
+    })
 
-    if (chatExists) {
-      try {
-        chatMembers.forEach(async (userId) => {
-          await updateExistingChatPreview(userId)
-          NotificationsService.sendNotifications(admin, userId, data.message, chatID, displayName)
-        })
+    NotificationsService.sendNotifications(admin, uid, message, chatID, displayName, chatMembers)
 
-        return Handlers.success('Chat preview updated', {
-          chat_id: chatID
-        }, 200)
-      } catch(error) {
-        return Handlers.error('Could not create chat', error, 500)
-      }
-    } else {
-      try {
-        await createNewChatPreview()
-        await addChatMembers()
-        await addNewContactToExistingChats()
-  
-        return Handlers.success('New chat was successfully created', {
-          chat_id: chatID
-        }, 200)
-      } catch(error) {
-        return Handlers.error('Could not create chat', error, 500)
-      }
-    }
+    return Handlers.success('Chat preview updated', {
+      chat_id: chatID
+    }, 200)
   } catch (error) {
     return Handlers.error('Could not create chat', error, 500)
   }

@@ -1,7 +1,7 @@
 import { Handlers } from './handlers'
 
 export const NotificationsService = {
-  sendNotifications: (admin: any, uid: string, message: string, chatID: string, title: string) => {
+  sendNotifications: (admin: any, uid: string, message: string, chatID: string, title: string = 'New message', uids: Array<string>) => {
     const databaseReference = (path: string) => admin.database().ref(path)
     const maxTextLength = 55
 
@@ -33,10 +33,12 @@ export const NotificationsService = {
           }
   
           const tokensArray = Object.keys(tokenSnapshot)
-          const response = await admin.messaging().sendToDevice(tokensArray, payload)
+          console.log(tokensArray)
+          const response = await admin.messaging().sendToDevice(tokensArray, payload) // only to one
   
           response.results.forEach((result, index) => {
             const error = result.error
+            console.warn(error)
             const tokenErrorPossibilities = ['messaging/invalid-registration-token', 'messaging/registration-token-not-registered']
   
             if (error && tokenErrorPossibilities.indexOf(error.code) !== -1) {
@@ -52,10 +54,8 @@ export const NotificationsService = {
   
       const sendNotifications = async () => {
         try {
-          const chatMembers = await databaseReference(`chat_members/${chatID}`)
-          const uids: Array<string> = Object.keys(chatMembers.val())
-
           if (uids.length > 2) {
+            console.log('Sending group notification')
             const group: any = await databaseReference(`groups/${chatID}`)
             payload.notification.title = group.val().title
           }

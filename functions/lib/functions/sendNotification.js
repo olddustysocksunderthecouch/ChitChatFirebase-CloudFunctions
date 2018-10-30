@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const handlers_1 = require("./handlers");
 exports.NotificationsService = {
-    sendNotifications: (admin, uid, message, chatID, title) => {
+    sendNotifications: (admin, uid, message, chatID, title = 'New message', uids) => {
         const databaseReference = (path) => admin.database().ref(path);
         const maxTextLength = 55;
         try {
@@ -36,9 +36,11 @@ exports.NotificationsService = {
                         return handlers_1.Handlers.success('No device tokens', {}, 204);
                     }
                     const tokensArray = Object.keys(tokenSnapshot);
-                    const response = yield admin.messaging().sendToDevice(tokensArray, payload);
+                    console.log(tokensArray);
+                    const response = yield admin.messaging().sendToDevice(tokensArray, payload); // only to one
                     response.results.forEach((result, index) => {
                         const error = result.error;
+                        console.warn(error);
                         const tokenErrorPossibilities = ['messaging/invalid-registration-token', 'messaging/registration-token-not-registered'];
                         if (error && tokenErrorPossibilities.indexOf(error.code) !== -1) {
                             databaseReference(`/device_tokens/${recipientUID}/${tokenSnapshot[index]}`).remove();
@@ -52,9 +54,8 @@ exports.NotificationsService = {
             });
             const sendNotifications = () => __awaiter(this, void 0, void 0, function* () {
                 try {
-                    const chatMembers = yield databaseReference(`chat_members/${chatID}`);
-                    const uids = Object.keys(chatMembers.val());
                     if (uids.length > 2) {
+                        console.log('Sending group notification');
                         const group = yield databaseReference(`groups/${chatID}`);
                         payload.notification.title = group.val().title;
                     }

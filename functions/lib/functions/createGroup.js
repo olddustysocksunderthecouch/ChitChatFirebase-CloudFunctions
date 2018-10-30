@@ -19,8 +19,9 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
         return handlers_1.Handlers.error('Bad request', null, 400);
     }
     const databaseReference = (path) => admin.database().ref(path);
-    const { uid, displayName } = context.auth;
+    const { uid } = context.auth;
     const { uids } = data;
+    const displayName = context.auth.token.name;
     const timestamp = (new Date()).getTime();
     const previewObject = {
         last_message: `${displayName} just created a group`,
@@ -52,6 +53,7 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
         const createChatPreview = yield createNewChatPreviewForGroupCreator();
         const chatID = createChatPreview.key;
         const uidsObject = {};
+        uids.push(uid);
         uids.forEach((userID) => __awaiter(this, void 0, void 0, function* () {
             yield createNewChatPreview(userID, chatID);
             uidsObject[userID] = true;

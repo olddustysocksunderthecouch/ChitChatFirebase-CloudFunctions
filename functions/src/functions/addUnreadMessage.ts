@@ -9,6 +9,7 @@ export const addUnreadMessage = async (snapshot, context) => {
   }
 
   const { chatID, messageID } = context.params
+  const { uid } = context.auth
   const { exists, minLength } = Validators
 
   if(!exists(chatID) || !minLength(chatID, 10) || !exists(messageID) || !minLength(messageID, 10)) {
@@ -18,7 +19,7 @@ export const addUnreadMessage = async (snapshot, context) => {
   const databaseReference = (path: string) => admin.database().ref(path)
 
   try {
-    await databaseReference(`messages_unread/${chatID}`).update({
+    await databaseReference(`messages_unread/${uid}/${chatID}`).update({
       [messageID]: true
     })
 

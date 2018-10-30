@@ -7,7 +7,7 @@ export default (functions, admin) => (data, context) => {
 		return Handlers.triggerAuthorizationError()
   }
 
-  const { exists, minLength } = Validators
+  const { exists } = Validators
 
   if(!exists(data)) {
     return Handlers.error('Bad request', null, 400)

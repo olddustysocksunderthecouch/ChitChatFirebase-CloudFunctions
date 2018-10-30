@@ -17,12 +17,14 @@
 
 import * as functions from 'firebase-functions'
 import * as admin from 'firebase-admin'
-import { addDeviceToken, createAccount, sendMessage, createGroup, addUnreadMessage } from './functions'
+import { addDeviceToken, createAccount, sendMessage, createGroup, updateMessageStatus, addUnreadMessage, deleteUnreadMessages } from './functions'
 
 admin.initializeApp()
 
 exports.addDeviceToken = functions.https.onCall(addDeviceToken(functions, admin))
 exports.createAccount = functions.https.onCall(createAccount(functions, admin))
-exports.sendMessage = functions.https.onCall(sendMessage(functions, admin))
+exports.sendMessage = functions.database.ref('/messages/{chatID}/{messageID}').onCreate(sendMessage)
 exports.createGroup = functions.https.onCall(createGroup(functions, admin))
+exports.updateMessageStatus = functions.https.onCall(updateMessageStatus(functions, admin))
 exports.addUnreadMessage = functions.database.ref('/messages/{chatID}/{messageID}').onWrite(addUnreadMessage)
+exports.deleteUnreadMessages = functions.database.ref('/messages_unread/{userID}/{chatID}').onDelete(deleteUnreadMessages)

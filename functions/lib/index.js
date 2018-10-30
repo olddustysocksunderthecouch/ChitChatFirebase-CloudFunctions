@@ -23,5 +23,7 @@ exports.addDeviceToken = functions.https.onCall(functions_1.addDeviceToken(funct
 exports.createAccount = functions.https.onCall(functions_1.createAccount(functions, admin));
 exports.sendMessage = functions.https.onCall(functions_1.sendMessage(functions, admin));
 exports.createGroup = functions.https.onCall(functions_1.createGroup(functions, admin));
+exports.updateMessageStatus = functions.https.onCall(functions_1.updateMessageStatus(functions, admin));
 exports.addUnreadMessage = functions.database.ref('/messages/{chatID}/{messageID}').onWrite(functions_1.addUnreadMessage);
+exports.deleteUnreadMessages = functions.database.ref('/messages_unread/{userID}/{chatID}').onDelete(functions_1.deleteUnreadMessages);
 //# sourceMappingURL=index.js.map

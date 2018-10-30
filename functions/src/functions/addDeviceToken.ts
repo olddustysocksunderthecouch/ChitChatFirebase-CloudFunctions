@@ -21,6 +21,6 @@ export default (functions, admin) => (data, context) => {
   }).then(() => {
     return Handlers.success('Device token successfully added', {}, 204)
   }).catch(error => {
-    return Handlers.error('Could not create user', error, 500)
+    return Handlers.error('Could not add device token', error, 500)
   })
 }

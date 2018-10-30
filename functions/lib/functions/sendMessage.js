@@ -16,16 +16,13 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
         return handlers_1.Handlers.triggerAuthorizationError();
     }
     const { exists, minLength, isType } = validators_1.Validators;
-    if (!exists(data.chat_id) || !minLength(data.chat_id, 10)) {
-        return handlers_1.Handlers.error('Bad request', null, 400);
-    }
-    if (!exists(data.message) || isType(data.message, 'string') || minLength(data.message, 1)) {
+    if (!exists(data.message) || !isType(data.message, 'string') || !minLength(data.message, 1)) {
         return handlers_1.Handlers.error('invalid-argument', {
             reason: 'The function must be called with one arguments "text" containing the message text to add.'
-        }, 500);
+        }, 400);
     }
-    const { message } = data;
-    const { uid, displayName } = context.auth;
+    const { uid } = context.auth;
+    const displayName = context.auth.token.name;
     const timestamp = (new Date()).getTime();
     const databaseReference = (path) => admin.database().ref(path);
     const recipientUID = data.recipient_uid;
@@ -44,10 +41,8 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
             return databaseReference(`existing_chats/${uid}`).once('value').then(chats => {
                 const chatsSnapshot = chats.val();
                 const snapshotContainsUserID = () => {
-                    console.log(chatsSnapshot);
                     if (chatsSnapshot) {
                         const snapshotChatIDs = Object.keys(chatsSnapshot);
-                        console.log(snapshotChatIDs);
                         return snapshotChatIDs.length && snapshotChatIDs.indexOf(data.recipient_uid) !== -1;
                     }
                     return false;
@@ -78,9 +73,9 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
         }
     });
     const createNewChatPreview = () => {
-        return databaseReference(`chat_preview/${uid}`).push(previewObject).then(snapshot => {
+        return databaseReference(`chat_preview/${uid}`).push(Object.assign({}, previewObject, { uid: recipientUID })).then(snapshot => {
             chatID = snapshot.key;
-            return databaseReference(`chat_preview/${recipientUID}/${chatID}`).update(Object.assign({}, previewObject, { is_group: false }));
+            return databaseReference(`chat_preview/${recipientUID}/${chatID}`).update(Object.assign({}, previewObject, { is_group: false, uid }));
         });
     };
     const updateExistingChatPreview = (userId) => {
@@ -126,8 +121,8 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
             try {
                 chatMembers.forEach((userId) => __awaiter(this, void 0, void 0, function* () {
                     yield updateExistingChatPreview(userId);
-                    sendNotification_1.NotificationsService.sendNotifications(admin, userId, data.message, chatID, displayName);
                 }));
+                sendNotification_1.NotificationsService.sendNotifications(admin, uid, data.message, chatID, displayName, chatMembers);
                 return handlers_1.Handlers.success('Chat preview updated', {
                     chat_id: chatID
                 }, 200);
@@ -141,6 +136,7 @@ exports.default = (functions, admin) => (data, context) => __awaiter(this, void 
                 yield createNewChatPreview();
                 yield addChatMembers();
                 yield addNewContactToExistingChats();
+                sendNotification_1.NotificationsService.sendNotifications(admin, uid, data.message, chatID, displayName, [data.recipient_uid]);
                 return handlers_1.Handlers.success('New chat was successfully created', {
                     chat_id: chatID
                 }, 200);

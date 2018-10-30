@@ -4,7 +4,9 @@
     "messages": {
       "$chatid": {
         ".read": "root.child('chat_members').child($chatid).hasChild(auth.uid)",
-        ".write": "root.child('chat_members').child($chatid).hasChild(auth.uid) && !data.exists()"
+        "$pushID": {
+          ".write": "root.child('chat_members').child($chatid).hasChild(auth.uid) && !data.exists()"
+        }
       }
     },
     "existing_chats": {

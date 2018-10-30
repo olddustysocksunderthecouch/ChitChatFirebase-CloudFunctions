@@ -2,20 +2,24 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Handlers = {
     error: (message, error, code) => {
-        return {
+        const errorResponse = {
             status: 'error',
             message,
             error,
             code
         };
+        console.error(errorResponse);
+        return errorResponse;
     },
     success: (message, body, code) => {
-        return {
+        const successResponse = {
             status: 'success',
             message,
             body,
             code
         };
+        // console.log(successResponse)
+        return successResponse;
     },
     triggerAuthorizationError: () => {
         return exports.Handlers.error('Authorization Error', {

@@ -2,20 +2,26 @@ import { ErrorResponse, SuccessResponse } from '../../interfaces/responses.model
 
 export const Handlers = {
   error: (message: string, error: any, code: number): ErrorResponse => {
-    return {
+    const errorResponse: ErrorResponse = {
       status: 'error',
       message,
       error,
       code
     }
+
+    console.error(errorResponse)
+    return errorResponse
   },
   success: (message: string, body: any, code: number): SuccessResponse => {
-    return {
+    const successResponse: SuccessResponse = {
       status: 'success',
       message,
       body,
       code
     }
+
+    // console.log(successResponse)
+    return successResponse
   },
   triggerAuthorizationError: () => {
     return Handlers.error('Authorization Error', {
