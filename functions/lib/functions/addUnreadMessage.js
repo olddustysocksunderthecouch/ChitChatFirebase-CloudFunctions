@@ -17,13 +17,14 @@ exports.addUnreadMessage = (snapshot, context) => __awaiter(this, void 0, void 0
     }
     const { chatID, messageID } = context.params;
     const { uid } = context.auth;
+    const { sender_uid } = snapshot.val();
     const { exists, minLength } = validators_1.Validators;
     if (!exists(chatID) || !minLength(chatID, 10) || !exists(messageID) || !minLength(messageID, 10)) {
         return handlers_1.Handlers.error('Bad request', null, 400);
     }
     const databaseReference = (path) => admin.database().ref(path);
     try {
-        yield databaseReference(`messages_unread/${uid}/${chatID}`).update({
+        yield databaseReference(`messages_unread/${sender_uid}/${chatID}`).update({
             [messageID]: true
         });
         return handlers_1.Handlers.success('Unread message counter updated', null, 204);

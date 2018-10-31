@@ -22,7 +22,6 @@ export default (functions, admin) => async (data, context) => {
   const databaseReference = (path: string) => admin.database().ref(path)
   const recipientUID: string = data.recipient_uid
   let chatID: string
-  let chatMembers: Array<string>
 
   const previewObject = {
     last_message: data.message,

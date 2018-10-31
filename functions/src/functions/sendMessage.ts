@@ -9,8 +9,8 @@ export const sendMessage = async (snapshot, context) => {
     return Handlers.triggerAuthorizationError()
   }
 
-  const { chatID, messageID } = context.params
-  const { message } = context.data.val()
+  const { chatID } = context.params
+  const { message } = snapshot.val()
 
   const { exists, minLength, isType } = Validators
 
@@ -45,10 +45,10 @@ export const sendMessage = async (snapshot, context) => {
 
         if (membersSnapshot) {
           const snapshotChatIDs = Object.keys(membersSnapshot)
-          return resolve(snapshotChatIDs)
+          resolve(snapshotChatIDs)
         }
 
-        return reject('No chat members found') 
+        reject('No chat members found') 
       }).catch(error => {
         reject(error)
       })

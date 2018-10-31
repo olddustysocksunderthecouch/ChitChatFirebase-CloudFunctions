@@ -4,7 +4,7 @@
     "messages": {
       "$chatid": {
         ".read": "root.child('chat_members').child($chatid).hasChild(auth.uid)",
-        "$pushID": {
+        "$messageID": {
           ".write": "root.child('chat_members').child($chatid).hasChild(auth.uid) && !data.exists()"
         }
       }
@@ -12,6 +12,11 @@
     "existing_chats": {
       "$uid": {
         ".read": "$uid === auth.uid"
+      }
+    },
+    "messages_unread": {
+      "$uid": {
+        ".write": "$uid === auth.uid"
       }
     }
   }
