@@ -1,60 +1,73 @@
-import { DataSnapshot } from "firebase-functions/lib/providers/database";
+import { Handlers } from './handlers'
+import { NotificationsService } from './sendNotification'
+import { Validators } from './validators'
+const admin = require('firebase-admin')
 
-export default (functions, admin) => (data, context) => {
-    const message = data.message;
-    const sender_name = data.sender_name
-    const timestamp = data.timestamp
-    const chatId = data.chat_id
+export const sendMessage = async (snapshot, context) => {
 
-    const uid = context.auth.uid;
+  if (!context.auth) {
+    return Handlers.triggerAuthorizationError()
+  }
 
-    // Validations and security
-    if (!(typeof message === 'string') || message.length === 0) {
-        // Throwing an HttpsError so that the client gets the error details.
-        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with ' +
-            'one arguments "text" containing the message text to add.');
-    }
+  const { chatID } = context.params
+  const { message } = snapshot.val()
 
-    if (!context.auth) {
-        // Throwing an HttpsError so that the client gets the error details.
-        throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
-            'while authenticated.');
-    }
+  const { exists, minLength, isType } = Validators
 
-    admin.database().ref('/chat_members/' + chatId + '/' + context.auth.uid) .once('value', (snapshot:DataSnapshot) => {
-      if (!snapshot.exists()) { 
-        throw new functions.https.HttpsError('failed-precondition', 'The user must be a member of the chat.');
-      }
-  });
+  if (!exists(message) || !isType(message, 'string') || !minLength(message, 1)) {
+    return Handlers.error('invalid-argument', {
+      reason: 'The function must be called with one arguments "text" containing the message text to add.'
+    }, 400)
+  }
 
+  const { uid } = context.auth
+  const displayName = context.auth.token.name
+  const timestamp: number = (new Date()).getTime()
+  const databaseReference = (path: string) => admin.database().ref(path)
 
+  const previewObject = {
+    last_message: message,
+    unread_message_count: 0,
+    sender_name: displayName || 'Unknown',
+    sender_uid: uid,
+    status: 'sent',
+    timestamp
+  }
 
+  const updateExistingChatPreview = (userId): Promise<any> => {
+    return databaseReference(`chat_preview/${userId}/${chatID}`).update(previewObject)
+  }
 
-    admin.database().ref('/chat_members/'+ chatId).once('value', (snapshot:DataSnapshot) => {
-        console.log('snapshot.numChildren' + snapshot.numChildren);
-        snapshot.forEach((childSnapshot:DataSnapshot) => {
-                  console.log(childSnapshot.key)
-                  return true;
-                });
-    });
+  const getChatMembers = (): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      return databaseReference(`chat_members/${chatID}`).once('value').then(members => {
+        const membersSnapshot = members.val()
 
-    return admin.database().ref('/messages').push({
-      message: message,
-      sender_uid: uid, 
-      sender_name: sender_name,
-      timestamp: timestamp,
+        if (membersSnapshot) {
+          const snapshotChatIDs = Object.keys(membersSnapshot)
+          resolve(snapshotChatIDs)
+        }
 
-      
-    }).then(() => {
-      console.log('New Message written');
-      // Returning the sanitized message to the client.
-      return { message: message };
+        reject('No chat members found') 
+      }).catch(error => {
+        reject(error)
+      })
     })
-    // [END returnMessageAsync]
-  //   .catch((error) => {
-  //     // Re-throwing the error as an HttpsError so that the client gets the error details.
-  //     throw new functions.https.HttpsError('unknown', error.message, error);
-  //   });
-    // [END_EXCLUDE]
-  };
-  // [END messageFunctionTrigger]
+  }
+
+  try {
+    const chatMembers = await getChatMembers() 
+
+    chatMembers.forEach(async (userId) => {
+      await updateExistingChatPreview(userId)
+    })
+
+    NotificationsService.sendNotifications(admin, uid, message, chatID, displayName, chatMembers)
+
+    return Handlers.success('Chat preview updated', {
+      chat_id: chatID
+    }, 200)
+  } catch (error) {
+    return Handlers.error('Could not create chat', error, 500)
+  }
+}

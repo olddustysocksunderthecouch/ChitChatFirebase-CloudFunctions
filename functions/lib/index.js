@@ -21,6 +21,11 @@ const functions_1 = require("./functions");
 admin.initializeApp();
 exports.addDeviceToken = functions.https.onCall(functions_1.addDeviceToken(functions, admin));
 exports.createAccount = functions.https.onCall(functions_1.createAccount(functions, admin));
-exports.sendMessage = functions.https.onCall(functions_1.sendMessage(functions, admin));
-exports.startChat = functions.https.onCall(functions_1.startChat(functions, admin));
+exports.sendMessage = functions.database.ref('/messages/{chatID}/{messageID}').onCreate(functions_1.sendMessage);
+exports.createGroup = functions.https.onCall(functions_1.createGroup(functions, admin));
+exports.updateMessageStatus = functions.https.onCall(functions_1.updateMessageStatus(functions, admin));
+exports.addUnreadMessage = functions.database.ref('/messages/{chatID}/{messageID}').onWrite(functions_1.addUnreadMessage);
+exports.deleteUnreadMessages = functions.database.ref('/messages_unread/{userID}/{chatID}').onDelete(functions_1.deleteUnreadMessages);
+exports.creatNewChat = functions.https.onCall(functions_1.creatNewChat(functions, admin));
+exports.leaveChat = functions.https.onCall(functions_1.leaveChat(functions, admin));
 //# sourceMappingURL=index.js.map

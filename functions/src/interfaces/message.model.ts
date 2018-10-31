@@ -1,4 +1,4 @@
-import { UID } from './uid-list'
+import { UID } from './uid-list.model'
 
 export interface Message {
     message: string;

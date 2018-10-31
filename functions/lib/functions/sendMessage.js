@@ -1,50 +1,70 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = (functions, admin) => (data, context) => {
-    const message = data.message;
-    const sender_name = data.sender_name;
-    const timestamp = data.timestamp;
-    const chatId = data.chat_id;
-    const uid = context.auth.uid;
-    // Validations and security
-    if (!(typeof message === 'string') || message.length === 0) {
-        // Throwing an HttpsError so that the client gets the error details.
-        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with ' +
-            'one arguments "text" containing the message text to add.');
-    }
-    if (!context.auth) {
-        // Throwing an HttpsError so that the client gets the error details.
-        throw new functions.https.HttpsError('failed-precondition', 'The function must be called ' +
-            'while authenticated.');
-    }
-    admin.database().ref('/chat_members/' + chatId + '/' + context.auth.uid).once('value', (snapshot) => {
-        if (!snapshot.exists()) {
-            throw new functions.https.HttpsError('failed-precondition', 'The user must be a member of the chat.');
-        }
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
-    admin.database().ref('/chat_members/' + chatId).once('value', (snapshot) => {
-        console.log('snapshot.numChildren' + snapshot.numChildren);
-        snapshot.forEach((childSnapshot) => {
-            console.log(childSnapshot.key);
-            return true;
-        });
-    });
-    return admin.database().ref('/messages').push({
-        message: message,
-        sender_uid: uid,
-        sender_name: sender_name,
-        timestamp: timestamp,
-    }).then(() => {
-        console.log('New Message written');
-        // Returning the sanitized message to the client.
-        return { message: message };
-    });
-    // [END returnMessageAsync]
-    //   .catch((error) => {
-    //     // Re-throwing the error as an HttpsError so that the client gets the error details.
-    //     throw new functions.https.HttpsError('unknown', error.message, error);
-    //   });
-    // [END_EXCLUDE]
 };
-// [END messageFunctionTrigger]
+Object.defineProperty(exports, "__esModule", { value: true });
+const handlers_1 = require("./handlers");
+const sendNotification_1 = require("./sendNotification");
+const validators_1 = require("./validators");
+const admin = require('firebase-admin');
+exports.sendMessage = (snapshot, context) => __awaiter(this, void 0, void 0, function* () {
+    if (!context.auth) {
+        return handlers_1.Handlers.triggerAuthorizationError();
+    }
+    const { chatID } = context.params;
+    const { message } = snapshot.val();
+    const { exists, minLength, isType } = validators_1.Validators;
+    if (!exists(message) || !isType(message, 'string') || !minLength(message, 1)) {
+        return handlers_1.Handlers.error('invalid-argument', {
+            reason: 'The function must be called with one arguments "text" containing the message text to add.'
+        }, 400);
+    }
+    const { uid } = context.auth;
+    const displayName = context.auth.token.name;
+    const timestamp = (new Date()).getTime();
+    const databaseReference = (path) => admin.database().ref(path);
+    const previewObject = {
+        last_message: message,
+        unread_message_count: 0,
+        sender_name: displayName || 'Unknown',
+        sender_uid: uid,
+        status: 'sent',
+        timestamp
+    };
+    const updateExistingChatPreview = (userId) => {
+        return databaseReference(`chat_preview/${userId}/${chatID}`).update(previewObject);
+    };
+    const getChatMembers = () => {
+        return new Promise((resolve, reject) => {
+            return databaseReference(`chat_members/${chatID}`).once('value').then(members => {
+                const membersSnapshot = members.val();
+                if (membersSnapshot) {
+                    const snapshotChatIDs = Object.keys(membersSnapshot);
+                    resolve(snapshotChatIDs);
+                }
+                reject('No chat members found');
+            }).catch(error => {
+                reject(error);
+            });
+        });
+    };
+    try {
+        const chatMembers = yield getChatMembers();
+        chatMembers.forEach((userId) => __awaiter(this, void 0, void 0, function* () {
+            yield updateExistingChatPreview(userId);
+        }));
+        sendNotification_1.NotificationsService.sendNotifications(admin, uid, message, chatID, displayName, chatMembers);
+        return handlers_1.Handlers.success('Chat preview updated', {
+            chat_id: chatID
+        }, 200);
+    }
+    catch (error) {
+        return handlers_1.Handlers.error('Could not create chat', error, 500);
+    }
+});
 //# sourceMappingURL=sendMessage.js.map
